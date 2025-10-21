@@ -1,0 +1,17 @@
+version: "3"
+
+services:
+  geoip-server:
+    image: ghcr.io/user00265/geoip-server:latest
+    restart: unless-stopped
+    container_name: geoip-server
+    environment:
+      - PORT=7502
+      - LOGLEVEL=warn
+      # - UPDATE_INTERVAL=86400
+      # - MAXMIND_ACCOUNT_ID=your_account_id
+      # - MAXMIND_LICENSE_KEY=your_license_key
+    ports:
+      - "7502:7502"
+    #volumes:
+    #  - ./db:/app/db

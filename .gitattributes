@@ -1,0 +1,20 @@
+# Ensure consistent line endings
+* text=auto
+
+# Go source files
+*.go linguist-language=Go
+
+# Docker and Compose files
+Dockerfile linguist-language=Dockerfile
+*.yml linguist-language=YAML
+*.yaml linguist-language=YAML
+
+# Shell scripts
+*.sh linguist-language=Shell
+
+# Ignore binary files for diff
+*.dat binary
+*.mmdb binary
+
+# Mark database folders as binary
+/db/* binary
