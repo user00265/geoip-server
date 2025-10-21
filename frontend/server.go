@@ -135,19 +135,30 @@ func NewServer(cfg *ServerConfig) *http.Server {
 	// ...existing code...
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// ...existing code...
 		cleanedPath := filepath.Clean(r.URL.Path)
-		if cleanedPath == "." || cleanedPath == "/" {
+		// Remove leading slash (lint: S1017)
+		cleanedPath = strings.TrimPrefix(cleanedPath, "/")
+		// Block path traversal
+		if cleanedPath == "." || cleanedPath == "" || strings.Contains(cleanedPath, "..") {
 			http.NotFound(w, r)
 			return
 		}
+		// Only allow known filenames
+		allowedV1 := map[string]bool{
+			"GeoIP.dat": true, "GeoIPv6.dat": true, "GeoIPCity.dat": true, "GeoIPCityv6.dat": true,
+			"GeoIPASNum.dat": true, "GeoIPASNumv6.dat": true, "GeoIPISP.dat": true, "GeoIPISPv6.dat": true,
+			"GeoIPOrg.dat": true, "GeoIPOrgv6.dat": true,
+		}
+		allowedV2 := map[string]bool{
+			"GeoLite2-ASN.mmdb": true, "GeoLite2-City.mmdb": true, "GeoLite2-Country.mmdb": true,
+		}
 		var requestedFilePath string
-		if strings.HasSuffix(cleanedPath, ".dat") {
+		if allowedV1[cleanedPath] {
 			requestedFilePath = filepath.Join("db/v1", cleanedPath)
-		} else if strings.HasSuffix(cleanedPath, ".mmdb") {
+		} else if allowedV2[cleanedPath] {
 			requestedFilePath = filepath.Join("db/v2", cleanedPath)
 		} else {
-			log.Debugf("Unknown extension for: %s", cleanedPath)
+			log.Debugf("Unknown or disallowed file: %s", cleanedPath)
 			http.NotFound(w, r)
 			return
 		}
