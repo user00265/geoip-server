@@ -31,7 +31,7 @@ jobs:
 
             - name: Extract version from tag
               id: vars
-              run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+              run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV && echo "::set-output name=VERSION::${GITHUB_REF#refs/tags/}"
 
             - name: Build and push Docker image
               uses: docker/build-push-action@v6
@@ -39,8 +39,8 @@ jobs:
                   context: .
                   push: true
                   tags: |
-                      ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+                      ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.VERSION }}
                       ghcr.io/${{ github.repository }}:latest
                   labels: |
                       org.opencontainers.image.source=${{ github.repositoryUrl }}
-                      org.opencontainers.image.version=${{ env.VERSION }}
+                      org.opencontainers.image.version=${{ steps.vars.outputs.VERSION }}
