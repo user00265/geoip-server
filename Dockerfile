@@ -12,19 +12,24 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # Download dependencies. This step is cached if go.mod/go.sum don't change.
-# CGO_ENABLED=0 is important for static binaries compatible with distroless/static
 RUN CGO_ENABLED=0 go mod download
 
 # Copy the source code
 COPY . .
 
 # Build the main application binary
-# -ldflags to embed version info into the binary
+# -ldflags to embed version info and strip debug symbols (-s -w) for smaller binary
 # Output binary to /geoip-server for easy copying in the next stage
-RUN CGO_ENABLED=0 go build -ldflags "-X 'main.BuildVersion=${BUILD_VERSION}' -X 'main.GitCommit=${GIT_COMMIT}'" -o /geoip-server ./
+RUN CGO_ENABLED=0 go build -ldflags "-s -w -X 'main.BuildVersion=${BUILD_VERSION}' -X 'main.GitCommit=${GIT_COMMIT}'" -o /geoip-server ./
 
-# Stage 2: Create the final Distroless image
-FROM gcr.io/distroless/static:latest
+# Create db directories with correct ownership for the non-root user.
+# Chainguard static uses UID 65532 (nonroot).
+RUN mkdir -p /db/v1 /db/v2 && chown -R 65532:65532 /db
+
+# Stage 2: Hardened runtime image
+# Chainguard static: zero known CVEs, rebuilt nightly, non-root by default,
+# includes CA certificates for HTTPS. No shell, no package manager.
+FROM cgr.dev/chainguard/static:latest
 
 # Set working directory for the application
 WORKDIR /app
@@ -32,19 +37,15 @@ WORKDIR /app
 # Copy the built executable from the builder stage
 COPY --from=builder /geoip-server /app/geoip-server
 
+# Copy the pre-created /db directory with correct ownership
+COPY --from=builder /db /db
+
 # Expose the web port
 EXPOSE 7502
 
 # Define the HEALTHCHECK using the binary's subcommand.
-# --start-period: gives the container time to initialize without failing the health check.
-# --interval: how often to run the check.
-# --timeout: how long to wait for the command to return.
-# --retries: how many consecutive failures before marking as unhealthy.
 HEALTHCHECK --start-period=60s --interval=60s --timeout=5s --retries=3 \
   CMD ["/app/geoip-server", "healthcheck"]
 
 # Set the entry point to run our application
-# The entrypoint will always be our main binary.
 ENTRYPOINT ["/app/geoip-server"]
-
-# No default CMD; geoip-server runs as server by default
